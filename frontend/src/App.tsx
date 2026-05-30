@@ -23,12 +23,14 @@ function App() {
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
   // Poll analytics
   useEffect(() => {
     if (!videoId) return;
     const interval = setInterval(async () => {
       try {
-        const res = await fetch('http://localhost:8000/analytics');
+        const res = await fetch(`${API_URL}/analytics`);
         if (res.ok) setAnalytics(await res.json());
       } catch { /* ignore */ }
     }, 500);
@@ -47,7 +49,7 @@ function App() {
     formData.append('file', file);
 
     try {
-      const response = await fetch('http://localhost:8000/upload', {
+      const response = await fetch(`${API_URL}/upload`, {
         method: 'POST', body: formData,
       });
       if (!response.ok) throw new Error(`Upload failed (${response.status})`);
@@ -174,7 +176,7 @@ function App() {
                   </div>
                 ) : (
                   <img
-                    src={`http://localhost:8000/stream/${videoId}`}
+                    src={`${API_URL}/stream/${videoId}`}
                     alt="AI Processed Stream"
                     className="w-full h-full object-contain"
                   />
