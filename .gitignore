@@ -1,0 +1,25 @@
+# Python
+backend/venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+frontend/*.local
+.npm/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Environment variables
+.env
+.env.local
+
+# Video Files
+*.mp4
+*.avi
+*.mov
