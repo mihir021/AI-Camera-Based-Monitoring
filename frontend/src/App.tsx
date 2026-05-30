@@ -1,8 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  Upload, Users, Activity, Play, AlertCircle,
-  Cpu, Eye, Zap, Shield, Camera, MonitorPlay,
-  ScanLine, ChevronRight, FileVideo, LayoutDashboard, Settings2
+  Upload, Play, AlertCircle,
+  Camera, MonitorPlay,
+  ScanLine, FileVideo, LayoutDashboard, Settings2, Activity
 } from 'lucide-react';
 
 interface Analytics {
