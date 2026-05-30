@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Upload, Play, AlertCircle,
   Camera, MonitorPlay,
-  ScanLine, FileVideo, LayoutDashboard, Settings2, Activity
+  ScanLine, FileVideo, LayoutDashboard, Settings2
 } from 'lucide-react';
 
 interface Analytics {
