@@ -5,23 +5,17 @@ import {
   ScanLine, FileVideo, LayoutDashboard, Settings2
 } from 'lucide-react';
 
-interface Analytics {
-  person_count: number;
-  fps: number;
-  confidence_avg: number;
-  frame_number: number;
-  total_frames: number;
-}
+
 
 function App() {
-  const [videoId, setVideoId] = useState<string | null>(null);
+  const [videoId, setVideoId] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [analytics, setAnalytics] = useState<Analytics>({
+  const [error, setError] = useState(null);
+  const [fileName, setFileName] = useState(null);
+  const [analytics, setAnalytics] = useState({
     person_count: 0, fps: 0, confidence_avg: 0, frame_number: 0, total_frames: 0,
   });
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef(null);
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -37,7 +31,7 @@ function App() {
     return () => clearInterval(interval);
   }, [videoId]);
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
@@ -55,7 +49,7 @@ function App() {
       if (!response.ok) throw new Error(`Upload failed (${response.status})`);
       const data = await response.json();
       setVideoId(data.video_id);
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || 'Upload failed. Is the backend running on port 8000?');
     } finally {
       setIsUploading(false);
@@ -208,7 +202,7 @@ function App() {
               <input
                 type="file" accept="video/*" className="hidden" ref={fileInputRef}
                 onChange={handleFileUpload}
-                onClick={(e) => { (e.target as HTMLInputElement).value = ''; }}
+                onClick={(e) => { e.target.value = ''; }}
                 disabled={isUploading}
               />
               
@@ -266,7 +260,7 @@ function App() {
   );
 }
 
-function StatCard({ title, value, trend, trendColor }: { title: string, value: string, trend: string, trendColor: string }) {
+function StatCard({ title, value, trend, trendColor }) {
   return (
     <div className="glass-panel p-5 flex flex-col gap-1">
       <span className="text-xs font-medium text-[#a3a3a3]">{title}</span>
@@ -276,7 +270,7 @@ function StatCard({ title, value, trend, trendColor }: { title: string, value: s
   );
 }
 
-function ConfigRow({ label, value, valueColor = 'text-white' }: { label: string, value: string, valueColor?: string }) {
+function ConfigRow({ label, value, valueColor = 'text-white' }) {
   return (
     <div className="flex items-center justify-between text-sm">
       <span className="text-[#a3a3a3]">{label}</span>

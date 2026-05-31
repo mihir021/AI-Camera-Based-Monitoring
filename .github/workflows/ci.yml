@@ -54,7 +54,7 @@ jobs:
           cd frontend
           npm ci
 
-      - name: Build (TypeScript + Vite)
+      - name: Build and verify
         run: |
           cd frontend
           npm run build
