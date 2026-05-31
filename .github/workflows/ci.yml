@@ -56,3 +56,32 @@ jobs:
         run: |
           cd frontend
           npm run build
+
+  # ─── Job 3: Merge Conflict Check ──────────────────────
+  check-conflicts:
+    name: ⚔️ Check Merge Conflicts
+    runs-on: ubuntu-latest
+    if: github.ref != 'refs/heads/main' # Only run on non-main branches
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Needed to fetch main branch history
+
+      - name: Attempt merge with main
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Fetch main to compare against
+          git fetch origin main
+          
+          # Attempt a dry-run merge
+          if git merge origin/main --no-commit --no-ff; then
+            echo "✅ No merge conflicts with main detected!"
+          else
+            echo "❌ MERGE CONFLICT DETECTED!"
+            echo "Please pull the latest main branch and resolve conflicts locally."
+            exit 1
+          fi
