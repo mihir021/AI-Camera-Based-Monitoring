@@ -59,7 +59,7 @@ jobs:
 
   # ─── Job 3: Merge Conflict Check ──────────────────────
   check-conflicts:
-    name: ⚔️ Check Merge Conflicts
+    name:  Check Merge Conflicts
     runs-on: ubuntu-latest
     if: github.ref != 'refs/heads/main' # Only run on non-main branches
 

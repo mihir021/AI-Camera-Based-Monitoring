@@ -1,25 +1,96 @@
-# Python
-backend/venv/
+# =========================
+# System & IDE
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# (Keep .env.example tracked)
+
+# =========================
+# AI & Backend (Python)
+# =========================
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
-# Node / Frontend
-frontend/node_modules/
+# Virtual Environments
+venv/
+.venv/
+env/
+.env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+nosetests.xml
+coverage.xml
+
+# Backend Specific
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# =========================
+# Frontend (Node/React/Vite)
+# =========================
+node_modules/
 frontend/dist/
 frontend/dist-ssr/
 frontend/*.local
 .npm/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.eslintcache
+.parcel-cache/
 
-# OS Files
-.DS_Store
-Thumbs.db
-
-# Environment variables
-.env
-.env.local
-
-# Video Files
+# =========================
+# Media / Data
+# =========================
+# Ignore local test videos and large data processing outputs
 *.mp4
 *.avi
 *.mov
+*.mkv
+ai/data/processed/
+ai/data/raw/
+!ai/data/.gitkeep
+
+# Note: YOLO base models (e.g., yolov8n.pt) are currently tracked.
+# Uncomment below if you plan to ignore future heavy models:
+# *.pt
+# *.onnx
