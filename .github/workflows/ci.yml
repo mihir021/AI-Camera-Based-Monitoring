@@ -3,7 +3,6 @@ name: CI — Test & Build
 on:
   push:
   pull_request:
-    branches: [main, demo]
 
 jobs:
   # ─── Job 1: Backend Tests ──────────────────────────────
