@@ -20,7 +20,8 @@ app.add_middleware(
 )
 
 # Load the YOLOv8 model
-model = YOLO('yolov8n.pt')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../ai/models/yolov8n.pt')
+model = YOLO(MODEL_PATH)
 
 # Ensure uploads directory exists
 UPLOAD_DIR = "uploads"

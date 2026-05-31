@@ -22,9 +22,9 @@ with patch.dict("sys.modules", {"ultralytics": MagicMock(YOLO=mock_yolo)}):
 
     with mock.patch("ultralytics.YOLO", mock_yolo):
         # Reload to pick up mock
-        if "main" in sys.modules:
-            del sys.modules["main"]
-        import main as app_module
+        if "app.main" in sys.modules:
+            del sys.modules["app.main"]
+        import app.main as app_module
 
     client = TestClient(app_module.app)
 
