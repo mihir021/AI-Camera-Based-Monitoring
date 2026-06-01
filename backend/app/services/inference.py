@@ -4,8 +4,29 @@ from ultralytics import YOLO
 from app.core.config import MODEL_PATH
 from app.core.state import latest_analytics
 
-# Load the YOLOv8 model
-model = YOLO(MODEL_PATH)
+_model = None
+_model_error = None
+
+
+def get_model():
+    global _model, _model_error
+
+    if _model is not None:
+        return _model
+
+    try:
+        _model = YOLO(MODEL_PATH)
+        _model_error = None
+    except Exception as exc:
+        _model_error = str(exc)
+        _model = None
+
+    return _model
+
+
+def get_model_error():
+    get_model()
+    return _model_error
 
 def draw_premium_box(frame, box, conf, person_id):
     """Draw a sleek, modern bounding box with rounded corners and glow effect."""
@@ -113,6 +134,11 @@ def draw_hud(frame, person_count, fps, conf_avg, frame_num, total_frames):
 
 def generate_frames(video_path: str):
     cap = cv2.VideoCapture(video_path)
+    model = get_model()
+
+    if model is None:
+        cap.release()
+        raise RuntimeError(f"YOLO model could not be loaded: {get_model_error()}")
     
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     video_fps = cap.get(cv2.CAP_PROP_FPS) or 30

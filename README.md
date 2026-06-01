@@ -69,7 +69,14 @@ The backend requires Python and OpenCV dependencies.
 ```bash
 cd backend
 python -m venv venv
-source venv/bin/activate  # On Windows use: venv\Scripts\activate
+# PowerShell
+.\venv\Scripts\Activate.ps1
+
+# Command Prompt
+# venv\Scripts\activate.bat
+
+# Bash / Git Bash / WSL
+# source venv/bin/activate
 pip install -r requirements.txt
 
 # Set up environment variables
@@ -85,13 +92,14 @@ uvicorn app.main:app --reload --port 8000
 The frontend is a lightweight React Vite application.
 
 ```bash
-cd frontend
 npm install
 
-# Run the development server
+# Run the development server from the repo root
 npm run dev
 ```
 *The dashboard will be available at `http://localhost:5173`.*
+
+If you prefer to work directly inside the frontend workspace, you can still run `cd frontend && npm run dev` there.
 
 ---
 
