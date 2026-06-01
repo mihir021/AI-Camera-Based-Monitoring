@@ -90,12 +90,12 @@ with (
     patch("app.db.mongodb.get_db", return_value=_db_mock),
 ):
     # Clear any cached modules so the mocks take effect
+    # Keep app.db.* in sys.modules so the active patches remain applied.
     for mod in list(sys.modules.keys()):
-        if mod.startswith("app."):
+        if mod.startswith("app.") and not mod.startswith("app.db"):
             del sys.modules[mod]
 
     import app.main as app_module  # noqa: E402
-
 # Patch get_db at the service level so runtime calls also resolve to the mock
 for svc_module in [
     "app.services.camera_service",
