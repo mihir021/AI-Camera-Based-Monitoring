@@ -1,0 +1,21 @@
+# ─── YOLOv8 Dataset Configuration ─────────────────────────────────────────────
+# This file tells YOLO:
+#   1. Where to find the training images
+#   2. Where to find the validation images
+#   3. How many classes (types of objects) to detect
+#   4. What the class names are
+
+# Path to the data folder — using absolute path so YOLO always finds it
+path: /home/mihir/SEM-4/AI-Camera-Based-Monitoring/ai/data
+
+# Sub-folders inside 'path' for images
+train: images/train     # 80% of dataset — model LEARNS from these
+val:   images/val       # 20% of dataset — model is TESTED against these
+
+# Number of object types to detect
+nc: 1
+
+# Class names (in order)
+# 0 = student (the only class we care about for attendance tracking)
+names:
+  - student
