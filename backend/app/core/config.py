@@ -8,7 +8,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 # Swap this path to change which model the backend uses:
 #   yolov8n.pt        → Base pretrained model (80 general objects)
 #   classroom_v1.pt   → Fine-tuned classroom student detection model
-MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../../ai/models/classroom_v1.pt')
+MODEL_PATH = os.path.join(os.path.dirname(__file__), '../../../ai/models/yolov8n.pt')
 
 # ── MongoDB ───────────────────────────────────────────────────────────────────
 # Canonical database name used across the entire application.
