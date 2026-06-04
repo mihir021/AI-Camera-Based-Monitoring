@@ -1,8 +1,14 @@
 """
 MongoDB Atlas connection utility — Motor async driver.
 
+Secret resolution order for MONGODB_URI:
+  1. AWS Secrets Manager  (secret name: "ai-camera/mongodb-uri")
+     → Used in production — credentials never stored in files
+  2. Environment variable  MONGODB_URI  (from .env)
+     → Used in local development
+
 Responsibilities:
-  1.  Load MONGODB_URI from .env
+  1.  Resolve MONGODB_URI securely (Secrets Manager → .env fallback)
   2.  Connect to the 'ai_camera_platform' database
   3.  Verify connectivity with an admin ping
   4.  Ensure the analytics_snapshots time-series collection exists
@@ -14,6 +20,10 @@ Startup logs:
   ====================================
   🚀 Backend Starting...
   ====================================
+
+  🔐 Secret source: AWS Secrets Manager   ← production
+       OR
+  🔐 Secret source: .env file             ← local dev
 
   ✅ MongoDB Connected
   📂 Database: ai_camera_platform
@@ -28,6 +38,7 @@ Startup logs:
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from datetime import datetime
@@ -45,10 +56,62 @@ from pymongo.errors import (
 
 from app.core.config import DB_NAME
 
-# ── Load .env ─────────────────────────────────────────────────────────────────
+# ── Load .env (local dev fallback) ────────────────────────────────────────────
 _BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _ENV_PATH = os.path.join(_BASE_DIR, ".env")
 load_dotenv(dotenv_path=_ENV_PATH)
+
+
+# ── AWS Secrets Manager helper ─────────────────────────────────────────────────
+
+def _get_secret_from_aws(secret_name: str) -> str | None:
+    """
+    Fetch a secret string from AWS Secrets Manager.
+    Returns None if:
+      - boto3 is not installed
+      - AWS credentials are not configured
+      - The secret does not exist
+    This ensures local dev always works without AWS setup.
+    """
+    try:
+        import boto3
+        from botocore.exceptions import ClientError, NoCredentialsError
+
+        client = boto3.client("secretsmanager", region_name="us-east-1")
+        response = client.get_secret_value(SecretId=secret_name)
+
+        # Secret can be a plain string or a JSON object
+        secret = response.get("SecretString", "")
+        try:
+            return json.loads(secret).get("MONGODB_URI", secret)
+        except (json.JSONDecodeError, AttributeError):
+            return secret  # plain string — return as-is
+
+    except ImportError:
+        return None   # boto3 not installed — use .env
+    except Exception:  # noqa: BLE001 — NoCredentialsError, ClientError, etc.
+        return None   # AWS not reachable — use .env
+
+
+def _resolve_mongodb_uri() -> str | None:
+    """
+    Resolve MONGODB_URI using the secure priority order:
+      1. AWS Secrets Manager  → production / deployed environments
+      2. MONGODB_URI env var  → local development (.env file)
+    """
+    # 1️⃣ Try AWS Secrets Manager first
+    uri = _get_secret_from_aws("ai-camera/mongodb-uri")
+    if uri:
+        print("🔐 Secret source: AWS Secrets Manager")
+        return uri
+
+    # 2️⃣ Fallback to environment variable (loaded from .env above)
+    uri = os.getenv("MONGODB_URI")
+    if uri:
+        print("🔐 Secret source: .env file (local dev)")
+        return uri
+
+    return None
 
 # ── Module-level singletons ────────────────────────────────────────────────────
 _client: motor.motor_asyncio.AsyncIOMotorClient | None = None
@@ -81,9 +144,13 @@ async def connect_to_mongodb() -> motor.motor_asyncio.AsyncIOMotorClient:
     if _client is not None:          # already connected — skip
         return _client
 
-    uri = os.getenv("MONGODB_URI")
+    uri = _resolve_mongodb_uri()
     if not uri:
-        _print_failure_banner("MONGODB_URI is not set in the .env file.")
+        _print_failure_banner(
+            "MONGODB_URI could not be resolved.\n"
+            "  • Production: ensure AWS Secrets Manager secret 'ai-camera/mongodb-uri' exists.\n"
+            "  • Local dev:  ensure MONGODB_URI is set in backend/.env"
+        )
         sys.exit(1)
 
     print("\n====================================")
