@@ -249,6 +249,56 @@ async def video_feed(video_id: str):
     )
 
 
+@router.get("/stream-url")
+async def video_feed_url(url: str):
+    """
+    Directly streams an RTSP/HTTP URL (e.g., from a mobile IP Webcam app).
+    Bypasses DB lookup and session management for quick testing.
+    """
+    model_error = get_model_error()
+    if model_error is not None:
+        return JSONResponse(
+            status_code=503,
+            content={"error": "AI model unavailable", "details": model_error},
+        )
+
+    async def stream_frames_async():
+        frame_queue: asyncio.Queue = asyncio.Queue(maxsize=8)
+        loop = asyncio.get_event_loop()
+
+        def run_sync_generator():
+            try:
+                # generate_frames gracefully accepts HTTP/RTSP URLs
+                for chunk in generate_frames(url):
+                    future = asyncio.run_coroutine_threadsafe(
+                        frame_queue.put(chunk), loop
+                    )
+                    future.result(timeout=10)
+            except Exception:  # noqa: BLE001
+                pass
+            finally:
+                asyncio.run_coroutine_threadsafe(
+                    frame_queue.put(None), loop
+                ).result(timeout=5)
+
+        gen_thread = threading.Thread(target=run_sync_generator, daemon=True)
+        gen_thread.start()
+
+        try:
+            while True:
+                chunk = await frame_queue.get()
+                if chunk is None:
+                    break
+                yield chunk
+        finally:
+            gen_thread.join(timeout=2)
+
+    return StreamingResponse(
+        stream_frames_async(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
 @router.get("/analytics")
 async def get_analytics():
     """

@@ -1,0 +1,221 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  AI Camera Backend — EC2 g4dn.xlarge GPU Instance (Spot)
+  NVIDIA T4 GPU, auto-stop on idle, FastAPI + YOLOv8
+
+Parameters:
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: "SSH key pair name (create in EC2 Console → Key Pairs first)"
+
+  YourHomeIP:
+    Type: String
+    Description: "Your IP for SSH access — find it at whatismyip.com (format: 1.2.3.4/32)"
+    Default: "0.0.0.0/0"
+
+  GitHubRepo:
+    Type: String
+    Default: "https://github.com/mihir021/AI-Camera-Based-Monitoring.git"
+    Description: "GitHub repo to clone on the instance"
+
+Resources:
+
+  # ── Elastic IP — static URL that survives stop/start ───────────────────────
+  ElasticIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: ai-camera-backend-ip
+
+  # ── Security Group ──────────────────────────────────────────────────────────
+  BackendSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "AI Camera Backend — allow API + SSH"
+      SecurityGroupIngress:
+        # API access from anywhere (frontend → backend)
+        - IpProtocol: tcp
+          FromPort: 8000
+          ToPort: 8000
+          CidrIp: "0.0.0.0/0"
+          Description: "FastAPI backend port"
+        # SSH only from your IP
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref YourHomeIP
+          Description: "SSH from your IP only"
+
+  # ── IAM Role — EC2 can read secrets + be managed by SSM ────────────────────
+  EC2InstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ai-camera-ec2-role
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore  # SSM Session Manager
+      Policies:
+        - PolicyName: SecretsManagerAccess
+          PolicyDocument:
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Sub "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:ai-camera/*"
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [!Ref EC2InstanceRole]
+
+  # ── EC2 Spot Instance — g4dn.xlarge with NVIDIA T4 ─────────────────────────
+  GPUInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: g4dn.xlarge
+      # Deep Learning Base OSS Nvidia Driver AMI (Ubuntu 22.04) — us-east-1
+      # Has CUDA 12.x, cuDNN, nvidia drivers pre-installed
+      ImageId: ami-0d4b0b2e5ede07c42
+      KeyName: !Ref KeyPairName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      SecurityGroups:
+        - !Ref BackendSecurityGroup
+
+      # Spot instance — cheaper, stops gracefully if AWS reclaims
+      InstanceMarketOptions:
+        MarketType: spot
+        SpotOptions:
+          SpotInstanceType: persistent
+          InstanceInterruptionBehavior: stop   # STOP not terminate → data preserved
+
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 50          # 50GB — enough for model + pip cache
+            VolumeType: gp3
+            DeleteOnTermination: false   # Keep disk when stopped
+
+      Tags:
+        - Key: Name
+          Value: ai-camera-gpu-backend
+
+      # ── Bootstrap script — runs ONCE on first start ─────────────────────────
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+          exec > /var/log/bootstrap.log 2>&1
+
+          echo "======================================"
+          echo "  AI Camera Backend Bootstrap"
+          echo "======================================"
+
+          # System deps
+          apt-get update -y
+          apt-get install -y git python3-pip python3-venv libgl1 libglib2.0-0 \
+                             libsm6 libxext6 libxrender-dev libgomp1
+
+          # Clone repo
+          cd /home/ubuntu
+          git clone ${GitHubRepo} app
+          cd app/backend
+
+          # Python venv
+          python3 -m venv venv
+          source venv/bin/activate
+
+          # Install PyTorch with CUDA 12.1 FIRST (before requirements.txt)
+          pip install --upgrade pip -q
+          pip install torch torchvision \
+            --index-url https://download.pytorch.org/whl/cu121 -q
+
+          # Install app requirements
+          pip install -r requirements.txt -q
+
+          echo "✅ Dependencies installed"
+
+          # Verify GPU
+          python3 -c "import torch; print(f'GPU: {torch.cuda.get_device_name(0)}')" \
+            >> /var/log/bootstrap.log 2>&1
+
+          # ── Systemd service ──────────────────────────────────────────────────
+          cat > /etc/systemd/system/ai-camera.service << 'EOF'
+          [Unit]
+          Description=AI Camera FastAPI Backend (GPU)
+          After=network.target
+
+          [Service]
+          User=ubuntu
+          WorkingDirectory=/home/ubuntu/app/backend
+          ExecStart=/home/ubuntu/app/backend/venv/bin/uvicorn \
+            app.main:app --host 0.0.0.0 --port 8000 --workers 1
+          Restart=always
+          RestartSec=10
+          Environment=PYTHONUNBUFFERED=1
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable ai-camera
+          systemctl start ai-camera
+
+          echo "======================================"
+          echo "  Bootstrap Complete!"
+          echo "======================================"
+
+  # ── Associate Elastic IP with instance ─────────────────────────────────────
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref GPUInstance
+      EIP: !Ref ElasticIP
+
+  # ── CloudWatch Alarm — auto-stop when idle ──────────────────────────────────
+  IdleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: "ai-camera-gpu-idle"
+      AlarmDescription: "Stop GPU instance after 30 min of low CPU (idle)"
+      MetricName: CPUUtilization
+      Namespace: AWS/EC2
+      Dimensions:
+        - Name: InstanceId
+          Value: !Ref GPUInstance
+      Statistic: Average
+      Period: 300              # 5 minute windows
+      EvaluationPeriods: 6     # 6 × 5min = 30 min threshold
+      Threshold: 5             # Below 5% CPU = idle
+      ComparisonOperator: LessThanThreshold
+      AlarmActions:
+        - !Sub "arn:aws:swf:${AWS::Region}:${AWS::AccountId}:action/actions/AWS_EC2.InstanceId.Stop/1.0"
+      TreatMissingData: notBreaching
+
+Outputs:
+  BackendURL:
+    Description: "Your FastAPI backend URL — use this in VITE_API_URL"
+    Value: !Sub "http://${ElasticIP}:8000"
+
+  ElasticIPAddress:
+    Description: "Static IP (stays the same even after stop/start)"
+    Value: !Ref ElasticIP
+
+  InstanceId:
+    Description: "EC2 Instance ID — use to start/stop from CLI"
+    Value: !Ref GPUInstance
+
+  SSHCommand:
+    Description: "SSH into the instance (once running)"
+    Value: !Sub "ssh -i ai-camera-key.pem ubuntu@${ElasticIP}"
+
+  BootstrapLog:
+    Description: "Check setup progress on instance"
+    Value: "tail -f /var/log/bootstrap.log"

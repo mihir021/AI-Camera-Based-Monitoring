@@ -8,6 +8,7 @@ pytest
 # MongoDB Atlas (async driver) + env loading
 motor>=3.3.2
 pymongo>=4.7.0
+sahi>=0.11.14
 python-dotenv>=1.0.0
 # Pydantic email validation
 email-validator>=2.0.0

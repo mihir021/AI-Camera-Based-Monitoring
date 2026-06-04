@@ -12,6 +12,8 @@ function App() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState(null);
   const [fileName, setFileName] = useState(null);
+  const [liveUrl, setLiveUrl] = useState('');
+  const [isLiveUrlActive, setIsLiveUrlActive] = useState(false);
   const [analytics, setAnalytics] = useState({
     person_count: 0, fps: 0, confidence_avg: 0, frame_number: 0, total_frames: 0,
   });
@@ -21,7 +23,7 @@ function App() {
 
   // Poll analytics
   useEffect(() => {
-    if (!videoId) return;
+    if (!videoId && !isLiveUrlActive) return;
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`${API_URL}/analytics`);
@@ -29,7 +31,7 @@ function App() {
       } catch { /* ignore */ }
     }, 500);
     return () => clearInterval(interval);
-  }, [videoId]);
+  }, [videoId, isLiveUrlActive]);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -37,6 +39,7 @@ function App() {
     setIsUploading(true);
     setError(null);
     setVideoId(null);
+    setIsLiveUrlActive(false);
     setFileName(file.name);
 
     const formData = new FormData();
@@ -57,6 +60,20 @@ function App() {
   };
 
   const triggerFileInput = () => fileInputRef.current?.click();
+
+  const handleConnectLiveUrl = () => {
+    if (!liveUrl.trim()) return;
+    
+    let processedUrl = liveUrl.trim();
+    if (processedUrl.startsWith('http') && !processedUrl.endsWith('/video') && !processedUrl.endsWith('.m3u8')) {
+       processedUrl += '/video';
+       setLiveUrl(processedUrl);
+    }
+
+    setVideoId(null);
+    setFileName('Live Camera Feed');
+    setIsLiveUrlActive(true);
+  };
 
   const progress = analytics.total_frames > 0
     ? Math.round((analytics.frame_number / analytics.total_frames) * 100)
@@ -107,26 +124,26 @@ function App() {
         <div className="grid grid-cols-4 gap-4 mb-8">
           <StatCard
             title="Students Detected"
-            value={videoId ? analytics.person_count.toString() : '—'}
-            trend={videoId ? "Live" : "Waiting"}
-            trendColor={videoId ? "text-emerald-500" : "text-[#a3a3a3]"}
+            value={(videoId || isLiveUrlActive) ? analytics.person_count.toString() : '—'}
+            trend={(videoId || isLiveUrlActive) ? "Live" : "Waiting"}
+            trendColor={(videoId || isLiveUrlActive) ? "text-emerald-500" : "text-[#a3a3a3]"}
           />
           <StatCard
             title="Processing Speed"
-            value={videoId ? `${analytics.fps} fps` : '—'}
-            trend={videoId ? "Stable" : "Waiting"}
+            value={(videoId || isLiveUrlActive) ? `${analytics.fps} fps` : '—'}
+            trend={(videoId || isLiveUrlActive) ? "Stable" : "Waiting"}
             trendColor="text-[#a3a3a3]"
           />
           <StatCard
             title="Avg Confidence"
-            value={videoId ? `${(analytics.confidence_avg * 100).toFixed(1)}%` : '—'}
-            trend={videoId ? "High Accuracy" : "Waiting"}
-            trendColor={videoId ? "text-blue-500" : "text-[#a3a3a3]"}
+            value={(videoId || isLiveUrlActive) ? `${(analytics.confidence_avg * 100).toFixed(1)}%` : '—'}
+            trend={(videoId || isLiveUrlActive) ? "High Accuracy" : "Waiting"}
+            trendColor={(videoId || isLiveUrlActive) ? "text-blue-500" : "text-[#a3a3a3]"}
           />
           <StatCard
             title="Analysis Progress"
-            value={videoId ? `${progress}%` : '—'}
-            trend={videoId ? `${analytics.frame_number} / ${analytics.total_frames}` : "Waiting"}
+            value={(videoId || isLiveUrlActive) ? (isLiveUrlActive ? 'LIVE' : `${progress}%`) : '—'}
+            trend={(videoId || isLiveUrlActive) ? (isLiveUrlActive ? 'Streaming' : `${analytics.frame_number} / ${analytics.total_frames}`) : "Waiting"}
             trendColor="text-[#a3a3a3]"
           />
         </div>
@@ -143,7 +160,7 @@ function App() {
                   <MonitorPlay className="w-4 h-4 text-[#a3a3a3]" />
                   <span>Camera Feed</span>
                 </div>
-                {videoId && (
+                {(videoId || isLiveUrlActive) && (
                   <div className="flex items-center gap-2">
                     <span className="relative flex w-2 h-2">
                       <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
@@ -155,13 +172,13 @@ function App() {
               </div>
 
               <div className="aspect-[16/9] bg-[#050505] flex items-center justify-center relative">
-                {!videoId && !isUploading ? (
+                {!videoId && !isLiveUrlActive && !isUploading ? (
                   <div className="text-center">
                     <div className="w-12 h-12 rounded-full border border-[#262626] bg-[#0a0a0a] flex items-center justify-center mx-auto mb-3">
                       <Play className="w-5 h-5 text-[#a3a3a3] ml-1" />
                     </div>
                     <p className="text-sm font-medium">No Feed Available</p>
-                    <p className="text-xs text-[#a3a3a3] mt-1">Upload a source to begin processing.</p>
+                    <p className="text-xs text-[#a3a3a3] mt-1">Upload a source or connect a camera to begin.</p>
                   </div>
                 ) : isUploading ? (
                   <div className="text-center">
@@ -170,7 +187,7 @@ function App() {
                   </div>
                 ) : (
                   <img
-                    src={`${API_URL}/stream/${videoId}`}
+                    src={isLiveUrlActive ? `${API_URL}/stream-url?url=${encodeURIComponent(liveUrl)}` : `${API_URL}/stream/${videoId}`}
                     alt="AI Processed Stream"
                     className="w-full h-full object-contain"
                   />
@@ -178,7 +195,7 @@ function App() {
               </div>
 
               {/* Minimal Progress Bar */}
-              {videoId && (
+              {videoId && !isLiveUrlActive && (
                 <div className="h-0.5 bg-[#262626] w-full absolute bottom-0 left-0">
                   <div 
                     className="h-full bg-blue-500 transition-all duration-300" 
@@ -218,6 +235,29 @@ function App() {
                 <span className="text-xs text-[#a3a3a3]">MP4, AVI, MOV</span>
               </button>
 
+              <div className="my-4 flex items-center gap-2 text-[#a3a3a3]">
+                <div className="h-px bg-[#262626] flex-1"></div>
+                <span className="text-xs uppercase tracking-widest font-bold">OR</span>
+                <div className="h-px bg-[#262626] flex-1"></div>
+              </div>
+
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="http://192.168.x.x:8080/video" 
+                  value={liveUrl}
+                  onChange={(e) => setLiveUrl(e.target.value)}
+                  className="flex-1 bg-[#0a0a0a] border border-[#262626] rounded-md px-3 py-2 text-sm text-white placeholder-[#525252] focus:outline-none focus:border-[#404040]"
+                />
+                <button 
+                  onClick={handleConnectLiveUrl}
+                  className="px-4 bg-[#262626] hover:bg-[#404040] rounded-md text-sm font-medium transition-colors"
+                >
+                  Connect
+                </button>
+              </div>
+
+
               {fileName && !error && (
                 <div className="mt-3 px-3 py-2 bg-[#0a0a0a] border border-[#262626] rounded-md flex items-center gap-2">
                   <FileVideo className="w-3.5 h-3.5 text-[#a3a3a3] shrink-0" />
@@ -240,14 +280,14 @@ function App() {
               </h3>
               
               <div className="space-y-3">
-                <ConfigRow label="Model" value="YOLOv8 Nano" />
-                <ConfigRow label="Confidence" value="≥ 55%" />
+                <ConfigRow label="Model" value="YOLOv8 Small" />
+                <ConfigRow label="Confidence" value="≥ 45%" />
                 <ConfigRow label="Target" value="Person" />
-                <ConfigRow label="Backend" value="FastAPI" />
+                <ConfigRow label="Backend" value="FastAPI (GPU)" />
                 <ConfigRow 
                   label="Status" 
-                  value={videoId ? 'Active' : 'Idle'} 
-                  valueColor={videoId ? 'text-emerald-500' : 'text-[#a3a3a3]'} 
+                  value={(videoId || isLiveUrlActive) ? 'Active' : 'Idle'} 
+                  valueColor={(videoId || isLiveUrlActive) ? 'text-emerald-500' : 'text-[#a3a3a3]'} 
                 />
               </div>
             </div>
